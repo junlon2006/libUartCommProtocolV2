@@ -779,7 +779,7 @@ static int CHECK_HOOKS() {
   if (!CHECK_NOT_NULL(g_hooks.malloc_fn))  return -1;
   if (!CHECK_NOT_NULL(g_hooks.free_fn))    return -1;
   if (!CHECK_NOT_NULL(g_hooks.realloc_fn)) return -1;
-  if (!CHECK_NOT_NULL(g_hooks.msleep_fn))     return -1;
+  if (!CHECK_NOT_NULL(g_hooks.msleep_fn))  return -1;
   return 0;
 }
 
