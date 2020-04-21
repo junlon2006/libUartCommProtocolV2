@@ -35,7 +35,7 @@ static void* __sem_alloc() {
 
 static void __sem_destroy(void *sem) {
   rt_sem_detach(sem);
-  return rt_free(sem);
+  rt_free(sem);
 }
 
 static int __sem_init(void *sem, unsigned int value) {
