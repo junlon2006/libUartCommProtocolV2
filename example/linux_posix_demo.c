@@ -16,7 +16,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  **************************************************************************
  *
- * Description : linux_posix_demo.c
+ * Description : linux_posix_demo.
  * Author      : junlon2006@163.com
  * Date        : 2020.04.21
  *
@@ -37,7 +37,9 @@ static void* __sem_alloc() {
 }
 
 static void __sem_destroy(void *sem) {
-  return free(sem);
+  sem_t *s = (sem_t *)sem;
+  sem_destroy(s);
+  free(sem);
 }
 
 static int __sem_init(void *sem, unsigned int value) {
