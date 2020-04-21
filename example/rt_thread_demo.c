@@ -40,7 +40,7 @@ static void __sem_destroy(void *sem) {
 
 static int __sem_init(void *sem, unsigned int value) {
   struct rt_semaphore *s = (struct rt_semaphore *)sem;
-  s = rt_sem_init(s, "sem", value, RT_IPC_FLAG_FIFO);
+  return rt_sem_init(s, "sem", value, RT_IPC_FLAG_FIFO);
 }
 
 static int __sem_post(void *sem) {
