@@ -29,16 +29,16 @@ extern "C" {
 #endif
 
 /**
- * 1、模块的用途：串口应用层通信协议栈，实现类似TCP协议可靠传输：保证CommProtocolPacketAssembleAndSend发送的数据【必达、有序、不重复】，也支持类似UDP传输
+ * 1、模块的用途：串口应用层协议栈，实现类TCP协议可靠传输：保证CommProtocolPacketAssembleAndSend发送的数据【必达、有序、不重复】，也支持类似UDP传输
  * 2、平台适用性：该模块适用于一切平台，本身不依赖任何和系统相关的头文件及系统函数
- * 3、可移植性：  通过CommProtocolRegisterHooks注册，实现各平台的porting
+ * 3、可移植性：  通过CommProtocolRegisterHooks注册，实现向各平台porting
  * 4、调用流程：
  * 4.1、通过CommProtocolRegisterHooks注册协议栈需要的功能函数，主要包含三类：动态内存分配相关函数 （必备）
- *                                                                   信号量相关函数      （非必备，如可实现建议注册，可提升性能）
+ *                                                                   信号量相关函数      （非必备，建议注册，可提升性能）
  *                                                                   睡眠函数           （必备）
  * 4.2、通过CommProtocolInit初始化协议栈
- * 4.3、通过CommProtocolReceiveUartData接收串口接收的数据，进行协议栈解析
- * 4.4、通过CommProtocolPacketAssembleAndSend发送协议
+ * 4.3、通过CommProtocolReceiveUartData接收串口收到的数据，进行协议栈解析
+ * 4.4、通过CommProtocolPacketAssembleAndSend发送数据
  * 4.5、通过CommProtocolFinal注销模块，该接口理论上不应该调到
  */
 
@@ -52,7 +52,7 @@ typedef int                 (*CommWriteHandler)(char *buf, unsigned int len);
  * 协议栈解析输出结构体
  */ 
 typedef struct {
-  CommCmd        cmd;         /**< 消息类型，消息标志唯一码，全局唯一，请使用[1, 10000]闭区间的值，其他值不可用 */
+  CommCmd        cmd;         /**< 消息类型，全局唯一，请使用[1, 10000]闭区间的值，其他值不可用 */
   CommPayloadLen payload_len; /**< 消息参数长度 */
   char           payload[0];  /**< 消息体 */
 } PACKED CommPacket;
@@ -65,7 +65,7 @@ typedef enum {
 } CommProtocolErrorCode;
 
 /**
- * 协议栈可移植函数钩子注册指针集结构体
+ * 协议栈可移植函数钩子指针集合结构体，通过注册APIs实现平台移植
  */
 typedef struct {
   /* 动态内存分配相关的函数 */
@@ -75,7 +75,7 @@ typedef struct {
 
   /* 信号量相关的函数 */
   void* (*sem_alloc_fn)(void);                         /**< 分配信号量句柄hook */
-  void  (*sem_destroy_fn)(void *sem);                  /**< 是否信号量句柄hook */
+  void  (*sem_destroy_fn)(void *sem);                  /**< 回收信号量句柄hook */
   int   (*sem_init_fn)(void *sem, unsigned int value); /**< 信号量初始化hook */
   int   (*sem_post_fn)(void *sem);                     /**< 信号量释放hook */
   int   (*sem_wait_fn)(void *sem);                     /**< 信号量等待hook */
