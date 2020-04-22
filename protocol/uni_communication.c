@@ -31,6 +31,7 @@
 #define WAIT_ACK_TIMEOUT_MSEC         (200)
 #define TRY_RESEND_TIMES              (5)
 #define NULL                          ((void *)0)
+#define CHECK_NOT_NULL(ptr)           (ptr != NULL)
 
 /*-----------------------------------------------------------------*/
 /*           layout of uart communication app protocol             */
@@ -94,6 +95,7 @@ typedef struct {
   CommSequence          current_acked_seq;  /* current received sequence */
   char                  *protocol_buffer;
   InterruptHandle       interrupt_handle;
+  int                   sem_hooks_registered;
 } CommProtocolBusiness;
 
 static unsigned char        g_sync[6] = {'u', 'A', 'r', 'T', 'c', 'P'};
@@ -191,12 +193,7 @@ typedef struct {
 } Interruptable;
 
 static int _is_sem_hook_registered() {
-  return (NULL != g_hooks.sem_alloc_fn &&
-          NULL != g_hooks.sem_init_fn &&
-          NULL != g_hooks.sem_post_fn &&
-          NULL != g_hooks.sem_wait_fn &&
-          NULL != g_hooks.sem_timedwait_fn &&
-          NULL != g_hooks.sem_destroy_fn);
+  return (1 == g_comm_protocol_business.sem_hooks_registered);
 }
 
 static InterruptHandle InterruptCreate() {
@@ -771,11 +768,7 @@ static void _unregister_packet_receive_handler() {
   g_comm_protocol_business.on_recv_frame = NULL;
 }
 
-static int CHECK_NOT_NULL(void *ptr) {
-  return ptr != NULL;
-}
-
-static int CHECK_HOOKS() {
+static int _check_hooks_valid() {
   if (!CHECK_NOT_NULL(g_hooks.malloc_fn))  return -1;
   if (!CHECK_NOT_NULL(g_hooks.free_fn))    return -1;
   if (!CHECK_NOT_NULL(g_hooks.realloc_fn)) return -1;
@@ -783,9 +776,20 @@ static int CHECK_HOOKS() {
   return 0;
 }
 
+static void _check_sem_hooks_status() {
+  if (CHECK_NOT_NULL(g_hooks.sem_alloc_fn) &&
+      CHECK_NOT_NULL(g_hooks.sem_destroy_fn) &&
+      CHECK_NOT_NULL(g_hooks.sem_init_fn) &&
+      CHECK_NOT_NULL(g_hooks.sem_post_fn) &&
+      CHECK_NOT_NULL(g_hooks.sem_wait_fn) &&
+      CHECK_NOT_NULL(g_hooks.sem_timedwait_fn)) {
+    g_comm_protocol_business.sem_hooks_registered = 1;
+  }
+}
+
 static void _protocol_business_init() {
   _memset(&g_comm_protocol_business, 0, sizeof(g_comm_protocol_business));
-
+  _check_sem_hooks_status();
   g_comm_protocol_business.interrupt_handle = InterruptCreate();
   _set_current_acked_seq(((CommSequence)-1) >> 1);
 
@@ -824,7 +828,7 @@ static void _protocol_business_final() {
 
 int CommProtocolInit(CommWriteHandler write_handler,
                      CommRecvPacketHandler recv_handler) {
-  if (0 != CHECK_HOOKS()) return -1;
+  if (0 != _check_hooks_valid()) return -1;
   _protocol_business_init();
   _register_write_handler(write_handler);
   _register_packet_receive_handler(recv_handler);
