@@ -16,7 +16,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  **************************************************************************
  *
- * Description : linux_posix_demo.
+ * Description : linux_posix_demo.c
  * Author      : junlon2006@163.com
  * Date        : 2020.04.21
  *
@@ -120,6 +120,18 @@ static void __recv_comm_packet(CommPacket *packet) {
     default:
       break;
   }
+
+  /*!!! 切记该函数内不可以调用CommProtocolPacketAssembleAndSend
+   * 如需要回复，请使用异步的方式，在例外一个线程里调用
+   */
+}
+
+static void __uart_recv_task() {
+  //实现串口接收数据任务，将串口接收到的数据，送入协议栈入口函数CommProtocolReceiveUartData
+  //启动一个线程进行串口接收
+  char *buf;  //串口接收到的数据buf指针
+  int length; //串口接收到的数据长度
+  CommProtocolReceiveUartData(buf, length);
 }
 
 int main(int argc, char *argv[]) {
@@ -131,14 +143,18 @@ int main(int argc, char *argv[]) {
   //step2. 协议栈初始化
   CommProtocolInit(__uart_write_api, __recv_comm_packet);
 
-  //step3. 初始化完成后，即可以接收串口数据，如果要往串口写数据调用CommProtocolPacketAssembleAndSend();
-  //假设要往对端发送hearbeat，heartbeat结构需要双方协定好
+  //step3. 启动串口接收任务
+  __uart_recv_task();
+
+  //step4. 发送数据，比如发送心跳（非真实心跳，只做为例子）
   struct heartbeat_t h;
   h.sequence = 1;
   //Tips：参数HEART_BEAT_COMMAND为heartbeat的命令号，h为heartbeat消息带的参数，sizeof(h)参数长度，1代表可靠传输类似TCP
   int ret = CommProtocolPacketAssembleAndSend(HEART_BEAT_COMMAND, (char *)&h, sizeof(h), 1);
   if (ret == 0) {
     //发送成功了
+  } else {
+    //发送失败了，错误码参考CommProtocolErrorCode
   }
 
   return 0;
