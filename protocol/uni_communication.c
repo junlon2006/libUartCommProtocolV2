@@ -548,23 +548,17 @@ int CommProtocolPacketAssembleAndSend(CommCmd cmd, char *payload,
   return ret;
 }
 
-static CommPacket* _packet_disassemble(CommProtocolPacket *protocol_packet) {
-  CommPacket *packet;
+static int _packet_disassemble(CommProtocolPacket *protocol_packet,
+                               CommPacket *packet) {
   if (!_checksum_valid(protocol_packet)) {
-    return NULL;
+    return -1;
   }
 
-  packet = (CommPacket *)g_hooks.malloc_fn(sizeof(CommPacket) +
-                                           _payload_len_get(protocol_packet));
-  if (NULL == packet) {
-    return NULL;
-  }
-
-  packet->cmd = _byte2_big_endian_2_u16(protocol_packet->cmd);
+  packet->cmd         = _byte2_big_endian_2_u16(protocol_packet->cmd);
   packet->payload_len = _payload_len_get(protocol_packet);
-  _memcpy(packet->payload, _payload_get(protocol_packet), _payload_len_get(protocol_packet));
+  packet->payload     = _payload_get(protocol_packet);
 
-  return packet;
+  return 0;
 }
 
 static void _enlarge_protocol_buffer(char **orginal,
@@ -659,8 +653,8 @@ static void _one_protocol_frame_process(char *protocol_buffer) {
   }
 
   /* disassemble protocol buffer */
-  CommPacket* packet = _packet_disassemble(protocol_packet);
-  if (NULL == packet) {
+  CommPacket packet;
+  if (0 != _packet_disassemble(protocol_packet, &packet)) {
     _send_nack_frame(protocol_packet->sequence);
     return;
   }
@@ -670,10 +664,8 @@ static void _one_protocol_frame_process(char *protocol_buffer) {
 
   /* notify application when not ack frame nor duplicate frame */
   if (!_is_duplicate_frame(protocol_packet)) {
-    g_comm_protocol_business.on_recv_frame(packet);
+    g_comm_protocol_business.on_recv_frame(&packet);
   }
-
-  g_hooks.free_fn(packet);
 }
 
 static int _is_payload_len_crc16_valid(CommPayloadLen length,
@@ -768,7 +760,8 @@ L_END:
 }
 
 void CommProtocolReceiveUartData(unsigned char *buf, int len) {
-  for (int i = 0; i < len; i++) {
+  int i;
+  for (i = 0; i < len; i++) {
     _protocol_buffer_generate_byte_by_byte(buf[i]);
   }
 }
