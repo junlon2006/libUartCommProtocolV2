@@ -50,7 +50,7 @@ typedef int                 (*CommWriteHandler)(char *buf, unsigned int len);
 
 /**
  * 协议栈解析输出结构体
- */ 
+ */
 typedef struct {
   CommCmd        cmd;         /**< 消息类型，全局唯一，请使用[1, 10000]闭区间的值，其他值不可用 */
   CommPayloadLen payload_len; /**< 消息参数长度 */

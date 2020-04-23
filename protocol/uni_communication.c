@@ -68,21 +68,21 @@ typedef enum {
 
 typedef enum {
   LAYOUT_SYNC_IDX                 = 0,
-  LAYOUT_PAYLOAD_LEN_LOW_IDX      = 12,
-  LAYOUT_PAYLOAD_LEN_HIGH_IDX     = 13,
-  LAYOUT_PAYLOAD_LEN_CRC_LOW_IDX  = 14,
-  LAYOUT_PAYLOAD_LEN_CRC_HIGH_IDX = 15,
+  LAYOUT_PAYLOAD_LEN_HIGH_IDX     = 12,
+  LAYOUT_PAYLOAD_LEN_LOW_IDX      = 13,
+  LAYOUT_PAYLOAD_LEN_CRC_HIGH_IDX = 14,
+  LAYOUT_PAYLOAD_LEN_CRC_LOW_IDX  = 15,
 } CommLayoutIndex;
 
 typedef struct header {
-  unsigned char  sync[6];   /* must be "uArTcP" */
-  CommSequence   sequence;  /* sequence number */
-  CommControl    control;   /* header ctrl */
-  CommCmd        cmd;       /* command type, such as power on, power off etc */
-  CommChecksum   checksum;         /* checksum of packet, use crc16 */
-  CommPayloadLen payload_len;      /* the length of payload */
-  CommChecksum   payload_len_crc16;/* the crc16 of payload_len */
-  char           payload[0];       /* the payload */
+  unsigned char sync[6];   /* must be "uArTcP" */
+  CommSequence  sequence;  /* sequence number */
+  CommControl   control;   /* header ctrl */
+  unsigned char cmd[2];    /* command type, such as power on, power off etc */
+  unsigned char checksum[2];         /* checksum of packet, use crc16 */
+  unsigned char payload_len[2];      /* the length of payload */
+  unsigned char payload_len_crc16[2];/* the crc16 of payload_len */
+  char          payload[0];          /* the payload */
 } PACKED CommProtocolPacket;
 
 typedef struct {
@@ -101,6 +101,15 @@ typedef struct {
 static unsigned char        g_sync[6] = {'u', 'A', 'r', 'T', 'c', 'P'};
 static CommProtocolHooks    g_hooks   = {NULL};
 static CommProtocolBusiness g_comm_protocol_business;
+
+static unsigned short _byte2_big_endian_2_u16(unsigned char *buf) {
+  return ((unsigned short)buf[0] << 8) + (unsigned short)buf[1];
+}
+
+static void _u16_2_byte2_big_endian(unsigned short value, unsigned char *buf) {
+  buf[0] = (unsigned char)(value >> 8);
+  buf[1] = (unsigned char)(value & 0xFF);
+}
 
 static void _memcpy(void *dst, void *src, unsigned int size) {
   char *d = (char *)dst;
@@ -330,21 +339,21 @@ static void _control_set(CommProtocolPacket *packet,
 }
 
 static void _cmd_set(CommProtocolPacket *packet, CommCmd cmd) {
-  packet->cmd = cmd;
+  _u16_2_byte2_big_endian(cmd, packet->cmd);
 }
 
-static void _payload_len_set(CommProtocolPacket *packet,
-                             CommPayloadLen payload_len) {
-  packet->payload_len = payload_len;
+static void _payload_len_set(CommProtocolPacket *packet, CommPayloadLen payload_len) {
+  _u16_2_byte2_big_endian(payload_len, packet->payload_len);
 }
 
 static void _payload_len_crc16_set(CommProtocolPacket *packet) {
-  packet->payload_len_crc16 = _crc16((const char *)&packet->payload_len,
-                                     sizeof(CommPayloadLen));
+  unsigned short payload_len = _byte2_big_endian_2_u16(packet->payload_len);
+  unsigned short checksum = _crc16((const char *)&payload_len, sizeof(CommPayloadLen));
+  _u16_2_byte2_big_endian(checksum, packet->payload_len_crc16);
 }
 
 static CommPayloadLen _payload_len_get(CommProtocolPacket *packet) {
-  return packet->payload_len;
+  return _byte2_big_endian_2_u16(packet->payload_len);
 }
 
 static void _payload_set(CommProtocolPacket *packet,
@@ -355,22 +364,24 @@ static void _payload_set(CommProtocolPacket *packet,
 }
 
 static char* _payload_get(CommProtocolPacket *packet) {
-  return packet->payload;
+  return ((char *)packet) + sizeof(CommProtocolPacket);
 }
 
 static CommPayloadLen _packet_len_get(CommProtocolPacket *packet) {
-  return sizeof(CommProtocolPacket) + packet->payload_len;
+  return _byte2_big_endian_2_u16(packet->payload_len) + sizeof(CommProtocolPacket) ;
 }
 
 static void _checksum_calc(CommProtocolPacket *packet) {
-  packet->checksum = 0; /* make sure the checksum be zero before calculate */
-  packet->checksum = _crc16((const char*)packet, _packet_len_get(packet));
+  packet->checksum[0] = 0; /* make sure the checksum be zero before calculate */
+  packet->checksum[1] = 0;
+  unsigned short checksum = _crc16((const char*)packet, _packet_len_get(packet));
+  _u16_2_byte2_big_endian(checksum, packet->checksum);
 }
 
 static int _checksum_valid(CommProtocolPacket *packet) {
-  CommChecksum checksum = packet->checksum; /* get the checksum from packet */
+  CommChecksum checksum = _byte2_big_endian_2_u16(packet->checksum); /* get the checksum from packet */
   _checksum_calc(packet); /* calc checksum again */
-  return checksum == packet->checksum; /* check whether checksum valid or not */
+  return (checksum == _byte2_big_endian_2_u16(packet->checksum)); /* check whether checksum valid or not */
 }
 
 static void _unset_acked_sync_flag() {
@@ -382,14 +393,14 @@ static void _set_acked_sync_flag() {
 }
 
 static int _is_acked_packet(CommProtocolPacket *protocol_packet) {
-  return (protocol_packet->cmd == 0 &&
-          protocol_packet->payload_len == 0 &&
+  return (_byte2_big_endian_2_u16(protocol_packet->cmd) == 0 &&
+          _byte2_big_endian_2_u16(protocol_packet->payload_len) == 0 &&
           _is_acked_set(protocol_packet->control));
 }
 
 static int _is_nacked_packet(CommProtocolPacket *protocol_packet) {
-  return (protocol_packet->cmd == 0 &&
-          protocol_packet->payload_len == 0 &&
+  return (_byte2_big_endian_2_u16(protocol_packet->cmd) == 0 &&
+          _byte2_big_endian_2_u16(protocol_packet->payload_len) == 0 &&
           _is_nacked_set(protocol_packet->control));
 }
 
@@ -406,8 +417,12 @@ static int _wait_ack(CommAttribute *attribute, CommProtocolPacket *packet) {
 }
 
 static CommProtocolPacket* _packet_alloc(int payload_len) {
-  return (CommProtocolPacket *)g_hooks.malloc_fn(sizeof(CommProtocolPacket) +
-                                                 payload_len);
+  CommProtocolPacket *packet = (CommProtocolPacket *)g_hooks.malloc_fn(sizeof(CommProtocolPacket) +
+                                                                       payload_len);
+  if (packet) {
+    _memset(packet, 0, sizeof(CommProtocolPacket));
+  }
+  return packet;
 }
 
 static void _packet_free(CommProtocolPacket *packet) {
@@ -545,10 +560,9 @@ static CommPacket* _packet_disassemble(CommProtocolPacket *protocol_packet) {
     return NULL;
   }
 
-  packet->cmd = protocol_packet->cmd;
+  packet->cmd = _byte2_big_endian_2_u16(protocol_packet->cmd);
   packet->payload_len = _payload_len_get(protocol_packet);
-  _memcpy(packet->payload, _payload_get(protocol_packet),
-          _payload_len_get(protocol_packet));
+  _memcpy(packet->payload, _payload_get(protocol_packet), _payload_len_get(protocol_packet));
 
   return packet;
 }
@@ -702,27 +716,26 @@ static void _protocol_buffer_generate_byte_by_byte(unsigned char recv_c) {
     return;
   }
 
-  /* get payload length (low 8 bit) */
-  if (LAYOUT_PAYLOAD_LEN_LOW_IDX == index) {
-    length = recv_c;
-    goto L_HEADER;
-  }
-
   /* get payload length (high 8 bit) */
   if (LAYOUT_PAYLOAD_LEN_HIGH_IDX == index) {
-    length += (((unsigned short)recv_c) << 8);
+    length = (((unsigned short)recv_c) << 8);
     goto L_HEADER;
   }
 
-  /* get payload length src16 (low 8 bit) */
-  if (LAYOUT_PAYLOAD_LEN_CRC_LOW_IDX == index) {
-    length_crc16 = recv_c;
+  /* get payload length (low 8 bit) */
+  if (LAYOUT_PAYLOAD_LEN_LOW_IDX == index) {
+    length += recv_c;
     goto L_HEADER;
   }
 
   /* get payload length src16 (high 8 bit) */
   if (LAYOUT_PAYLOAD_LEN_CRC_HIGH_IDX == index) {
-    length_crc16 += (((unsigned short)recv_c) << 8);
+    length_crc16 = (((unsigned short)recv_c) << 8);
+    goto L_HEADER;
+  }
+
+  if (LAYOUT_PAYLOAD_LEN_CRC_LOW_IDX == index) {
+    length_crc16 += recv_c;
     if (!_is_payload_len_crc16_valid(length, length_crc16)) {
       _reset_protocol_buffer_status(&index, &length, &length_crc16);
       packet = (CommProtocolPacket *)g_comm_protocol_business.protocol_buffer;
