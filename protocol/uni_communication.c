@@ -346,8 +346,7 @@ static void _payload_len_set(CommProtocolPacket *packet, CommPayloadLen payload_
 }
 
 static void _payload_len_crc16_set(CommProtocolPacket *packet) {
-  unsigned short payload_len = _byte2_big_endian_2_u16(packet->payload_len);
-  unsigned short checksum = _crc16((const char *)&payload_len, sizeof(CommPayloadLen));
+  unsigned short checksum = _crc16((const char *)packet->payload_len, sizeof(CommPayloadLen));
   _u16_2_byte2_big_endian(checksum, packet->payload_len_crc16);
 }
 
@@ -669,7 +668,9 @@ static void _one_protocol_frame_process(char *protocol_buffer) {
 
 static int _is_payload_len_crc16_valid(CommPayloadLen length,
                                        CommChecksum crc) {
-  return crc == _crc16((const char *)&length, sizeof(CommPayloadLen));
+  unsigned char len[2];
+  _u16_2_byte2_big_endian(length, len);
+  return crc == _crc16((const char *)len, sizeof(CommPayloadLen));
 }
 
 static void _protocol_buffer_generate_byte_by_byte(unsigned char recv_c) {
