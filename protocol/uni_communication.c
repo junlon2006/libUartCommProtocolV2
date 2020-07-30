@@ -95,6 +95,7 @@ typedef struct {
   char                  *protocol_buffer;
   InterruptHandle       interrupt_handle;
   int                   sem_hooks_registered;
+  int                   inited;
 } CommProtocolBusiness;
 
 static unsigned char        g_sync[6] = {'u', 'A', 'r', 'T', 'c', 'P'};
@@ -761,6 +762,10 @@ L_END:
 
 void CommProtocolReceiveUartData(unsigned char *buf, int len) {
   int i;
+  if (!g_comm_protocol_business.inited) {
+    return;
+  }
+
   for (i = 0; i < len; i++) {
     _protocol_buffer_generate_byte_by_byte(buf[i]);
   }
@@ -815,6 +820,8 @@ static void _protocol_business_init() {
 
   g_comm_protocol_business.app_send_sync_lock = g_hooks.sem_alloc_fn();
   g_hooks.sem_init_fn(g_comm_protocol_business.app_send_sync_lock, 1);
+
+  g_comm_protocol_business.inited = 1;
 }
 
 static void _try_free_protocol_buffer() {
