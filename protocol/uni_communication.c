@@ -793,12 +793,19 @@ static void _check_sem_hooks_status() {
   }
 }
 
+static void _set_started_seq() {
+  char r1[1];
+  char *r2 = g_hooks.malloc_fn(sizeof(char));
+  if (r2) g_hooks.free_fn(r2);
+  g_comm_protocol_business.sequence = (CommSequence)((unsigned int)r1 ^ (unsigned int)r2);
+}
+
 static void _protocol_business_init() {
   _memset(&g_comm_protocol_business, 0, sizeof(g_comm_protocol_business));
   _check_sem_hooks_status();
   g_comm_protocol_business.interrupt_handle = InterruptCreate();
   _set_current_acked_seq(((CommSequence)-1) >> 1);
-
+  _set_started_seq();
   if (!_is_sem_hook_registered()) {
     return;
   }
