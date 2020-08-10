@@ -631,13 +631,11 @@ static void _one_protocol_frame_process(char *protocol_buffer) {
 
   /* ack frame donnot notify application, ignore it now */
   if (_is_acked_packet(protocol_packet)) {
-    if (protocol_packet->sequence == _current_sequence_get()) {
+    /* one sequence can only break once */
+    if (protocol_packet->sequence != _get_current_acked_seq()) {
       _set_acked_sync_flag();
-      /* one sequence can only break once */
-      if (protocol_packet->sequence != _get_current_acked_seq()) {
-        _set_current_acked_seq(protocol_packet->sequence);
-        InterruptableBreak(g_comm_protocol_business.interrupt_handle);
-      }
+      _set_current_acked_seq(protocol_packet->sequence);
+      InterruptableBreak(g_comm_protocol_business.interrupt_handle);
     }
     return;
   }
