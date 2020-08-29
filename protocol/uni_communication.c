@@ -56,7 +56,7 @@ typedef unsigned char  CommControl;
 typedef void*          InterruptHandle;
 
 typedef struct {
-  int reliable; /* 1 means this packet need acked, reliable transmission, 0 udp like*/
+  int reliable; /* 1 means this packet need acked, reliable transmission, 0 udp like */
 } CommAttribute;
 
 typedef enum {
