@@ -111,21 +111,21 @@ static void _u16_2_byte2_big_endian(unsigned short value, unsigned char *buf) {
   buf[1] = (unsigned char)(value & 0xFF);
 }
 
+/* src and dst never overlap. donot like memmove */
 static void _memcpy(void *dst, void *src, unsigned int size) {
-  char *d = (char *)dst;
-  char *s = (char *)src;
+  unsigned char *d = (unsigned char *)dst;
+  unsigned char *s = (unsigned char *)src;
   int i = 0;
-  while (size-- > 0) {
+  while (size--) {
     d[i] = s[i];
     i++;
   }
 }
 
-static void _memset(void *s, int c, unsigned int n) {
-  char *p = (char *)s;
-  int i = 0;
-  while (n-- > 0) {
-    p[i++] = c;
+static void _memset(void *s, unsigned char c, unsigned int n) {
+  unsigned char *p = (unsigned char *)s;
+  while (n--) {
+    *p++ = c;
   }
 }
 
