@@ -56,7 +56,7 @@ typedef unsigned char  CommControl;
 typedef void*          InterruptHandle;
 
 typedef struct {
-  int reliable; /* 1 means this packet need acked, reliable transmission, 0 udp like*/
+  int reliable; /* 1 means this packet need acked, reliable transmission, 0 udp like */
 } CommAttribute;
 
 typedef enum {
@@ -91,7 +91,7 @@ typedef struct {
   void*                 app_send_sync_lock; /* avoid app send concurrency, out of sequence */
   int                   acked;
   CommSequence          sequence;
-  CommSequence          current_acked_seq;  /* current received sequence */
+  short                 current_acked_seq;  /* current received sequence */
   char                  *protocol_buffer;
   InterruptHandle       interrupt_handle;
   int                   sem_hooks_registered;
@@ -259,11 +259,11 @@ static void _unregister_write_handler() {
   g_comm_protocol_business.on_write = NULL;
 }
 
-static void _set_current_acked_seq(CommSequence seq) {
+static void _set_current_acked_seq(short seq) {
   g_comm_protocol_business.current_acked_seq = seq;
 }
 
-static CommSequence _get_current_acked_seq() {
+static short _get_current_acked_seq() {
   return g_comm_protocol_business.current_acked_seq;
 }
 
@@ -621,6 +621,11 @@ static int _is_duplicate_frame(CommProtocolPacket *protocol_packet) {
   return duplicate;
 }
 
+static int _is_udp_packet(CommProtocolPacket *protocol_packet) {
+  return (_byte2_big_endian_2_u16(protocol_packet->cmd) != 0 &&
+          !_is_ack_set(protocol_packet->control));
+}
+
 static void _one_protocol_frame_process(char *protocol_buffer) {
   CommProtocolPacket *protocol_packet = (CommProtocolPacket *)protocol_buffer;
 
@@ -631,13 +636,12 @@ static void _one_protocol_frame_process(char *protocol_buffer) {
 
   /* ack frame donnot notify application, ignore it now */
   if (_is_acked_packet(protocol_packet)) {
-    if (protocol_packet->sequence == _current_sequence_get()) {
+    /* one sequence can only break once */
+    if (protocol_packet->sequence == _current_sequence_get() &&
+        (short)protocol_packet->sequence != _get_current_acked_seq()) {
       _set_acked_sync_flag();
-      /* one sequence can only break once */
-      if (protocol_packet->sequence != _get_current_acked_seq()) {
-        _set_current_acked_seq(protocol_packet->sequence);
-        InterruptableBreak(g_comm_protocol_business.interrupt_handle);
-      }
+      _set_current_acked_seq(protocol_packet->sequence);
+      InterruptableBreak(g_comm_protocol_business.interrupt_handle);
     }
     return;
   }
@@ -660,6 +664,11 @@ static void _one_protocol_frame_process(char *protocol_buffer) {
 
   /* ack automatically when ack attribute set */
   _do_ack(protocol_packet);
+
+  /* udp frame reset current acked seq -1 */
+  if (_get_current_acked_seq() != -1 && _is_udp_packet(protocol_packet)) {
+    _set_current_acked_seq(-1);
+  }
 
   /* notify application when not ack frame nor duplicate frame */
   if (!_is_duplicate_frame(protocol_packet)) {
