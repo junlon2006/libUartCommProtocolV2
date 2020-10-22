@@ -111,7 +111,9 @@ static void _u16_2_byte2_big_endian(unsigned short value, unsigned char *buf) {
   buf[1] = (unsigned char)(value & 0xFF);
 }
 
-/* src and dst never overlap. donot like memmove */
+/* src and dst never overlap. donot like memmove
+ * can perf by wordsize, unsigned long, must aligned address
+ */
 static void _memcpy(void *dst, void *src, unsigned int size) {
   unsigned char *d = (unsigned char *)dst;
   unsigned char *s = (unsigned char *)src;
