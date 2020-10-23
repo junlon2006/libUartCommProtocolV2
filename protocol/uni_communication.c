@@ -111,17 +111,41 @@ static void _u16_2_byte2_big_endian(unsigned short value, unsigned char *buf) {
   buf[1] = (unsigned char)(value & 0xFF);
 }
 
-/* src and dst never overlap. donot like memmove
- * can perf by wordsize, unsigned long, must aligned address
- */
-static void _memcpy(void *dst, void *src, unsigned int size) {
-  unsigned char *d = (unsigned char *)dst;
-  unsigned char *s = (unsigned char *)src;
-  int i = 0;
-  while (size--) {
-    d[i] = s[i];
-    i++;
+/* src and dst never overlap. donot like memmove */
+#define WORD_WIDTH (sizeof(unsigned long int))
+static void* _memcpy(void *dst, const void *src, unsigned int len) {
+  unsigned long int dstp = (unsigned long int)dst;
+  unsigned long int srcp = (unsigned long int)src;
+
+  while (len > 0) {
+    if (len < WORD_WIDTH ||
+        dstp % WORD_WIDTH != 0 || //aligned
+        srcp % WORD_WIDTH != 0) { //aligned
+      ((unsigned char *)dstp)[0] = ((unsigned char *)srcp)[0];
+      dstp += 1;
+      srcp += 1;
+      len -= 1;
+    } else break;
   }
+
+  unsigned int word_copy_cnt = len / WORD_WIDTH;
+  len = (len % WORD_WIDTH);
+
+  while (word_copy_cnt > 0) {
+    ((unsigned long int *)dstp)[0] = ((unsigned long int *)srcp)[0];
+    dstp += WORD_WIDTH;
+    srcp += WORD_WIDTH;
+    word_copy_cnt -= 1;
+  }
+
+  while (len > 0) {
+    ((unsigned char *)dstp)[0] = ((unsigned char *)srcp)[0];
+    dstp += 1;
+    srcp += 1;
+    len -= 1;
+  }
+
+  return dst;
 }
 
 static void _memset(void *s, unsigned char c, unsigned int n) {
