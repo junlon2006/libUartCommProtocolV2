@@ -148,11 +148,62 @@ static void* _memcpy(void *dst, const void *src, unsigned int len) {
   return dst;
 }
 
-static void _memset(void *s, unsigned char c, unsigned int n) {
-  unsigned char *p = (unsigned char *)s;
-  while (n--) {
-    *p++ = c;
+#define OPSIZ sizeof(unsigned long int)
+static void* _memset(void *dstpp, int c, unsigned int len) {
+  long int dstp = (long int) dstpp;
+  if (len >= 8) {
+    unsigned int xlen;
+    unsigned long int cccc;
+
+    cccc = (unsigned char) c;
+    cccc |= cccc << 8;
+    cccc |= cccc << 16;
+    if (OPSIZ > 4) {
+      /* Do the shift in two steps to avoid warning if long has 32 bits. */
+      cccc |= (cccc << 16) << 16;
+    }
+
+    /* There are at least some bytes to set. No need to test for LEN == 0 in this alignment loop. */
+    while (dstp % OPSIZ != 0) {
+      ((unsigned char *) dstp)[0] = c;
+      dstp += 1;
+      len -= 1;
+    }
+
+    /* Write 8 `unsigned long int' per iteration until less than 8 `unsigned long int' remain. */
+    xlen = len / (OPSIZ * 8);
+    while (xlen > 0) {
+      ((unsigned long int *)dstp)[0] = cccc;
+      ((unsigned long int *)dstp)[1] = cccc;
+      ((unsigned long int *)dstp)[2] = cccc;
+      ((unsigned long int *)dstp)[3] = cccc;
+      ((unsigned long int *)dstp)[4] = cccc;
+      ((unsigned long int *)dstp)[5] = cccc;
+      ((unsigned long int *)dstp)[6] = cccc;
+      ((unsigned long int *)dstp)[7] = cccc;
+      dstp += 8 * OPSIZ;
+      xlen -= 1;
+    }
+    len %= OPSIZ * 8;
+
+    /* Write 1 `op_t' per iteration until less than OPSIZ bytes remain. */
+    xlen = len / OPSIZ;
+    while (xlen > 0) {
+      ((unsigned long int *) dstp)[0] = cccc;
+      dstp += OPSIZ;
+      xlen -= 1;
+    }
+    len %= OPSIZ;
   }
+
+  /* Write the last few bytes. */
+  while (len > 0) {
+    ((unsigned char *) dstp)[0] = c;
+    dstp += 1;
+    len -= 1;
+  }
+
+  return dstpp;
 }
 
 void CommProtocolRegisterHooks(CommProtocolHooks *hooks) {
@@ -837,7 +888,7 @@ static void _set_started_seq() {
   char r1[1];
   char *r2 = g_hooks.malloc_fn(sizeof(char));
   if (r2) g_hooks.free_fn(r2);
-  g_comm_protocol_business.sequence = (CommSequence)((unsigned int)r1 ^ (unsigned int)r2);
+  g_comm_protocol_business.sequence = (CommSequence)((unsigned long int)r1 ^ (unsigned long int)r2);
 }
 
 static void _protocol_business_init() {
