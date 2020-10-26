@@ -111,7 +111,6 @@ static void _u16_2_byte2_big_endian(unsigned short value, unsigned char *buf) {
   buf[1] = (unsigned char)(value & 0xFF);
 }
 
-/* src and dst never overlap. donot like memmove */
 #define OPSIZ      (sizeof(unsigned long int))
 #define OP_T_THRES (OPSIZ * 2)
 #define BYTE_COPY_FWD(dst_bp, src_bp, nbytes) \
@@ -138,6 +137,7 @@ do {  \
   }  \
 } while (0)
 
+/* src and dst never overlap. donot like memmove */
 static void* _memcpy(void *dst, const void *src, unsigned int len) {
   unsigned long int dstp = (unsigned long int)dst;
   unsigned long int srcp = (unsigned long int)src;
