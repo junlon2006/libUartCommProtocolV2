@@ -113,7 +113,7 @@ static void _u16_2_byte2_big_endian(unsigned short value, unsigned char *buf) {
 
 /* src and dst never overlap. donot like memmove */
 #define OPSIZ      (sizeof(unsigned long int))
-#define OP_T_THRES (16)
+#define OP_T_THRES (OPSIZ * 2)
 #define BYTE_COPY_FWD(dst_bp, src_bp, nbytes) \
 do {  \
   unsigned int __nbytes = (nbytes);  \
