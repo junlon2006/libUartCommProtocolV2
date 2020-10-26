@@ -112,42 +112,57 @@ static void _u16_2_byte2_big_endian(unsigned short value, unsigned char *buf) {
 }
 
 /* src and dst never overlap. donot like memmove */
-#define WORD_WIDTH (sizeof(unsigned long int))
+#define OPSIZ      (sizeof(unsigned long int))
+#define OP_T_THRES (16)
+#define BYTE_COPY_FWD(dst_bp, src_bp, nbytes) \
+do {  \
+  unsigned int __nbytes = (nbytes);  \
+  while (__nbytes > 0) {  \
+    unsigned char __x = ((unsigned char *)src_bp)[0];  \
+    src_bp += 1;  \
+    __nbytes -= 1;  \
+    ((unsigned char *)dst_bp)[0] = __x;  \
+    dst_bp += 1;  \
+  }  \
+} while (0)
+
+#define WORD_COPY_FWD(dst_bp, src_bp, nwords) \
+do {  \
+  unsigned int __nwords = (nwords);  \
+  while (__nwords > 0) {  \
+    unsigned long int __x = ((unsigned long int *)src_bp)[0];  \
+    src_bp += OPSIZ;  \
+    __nwords -= 1;  \
+    ((unsigned long int *)dst_bp)[0] = __x;  \
+    dst_bp += OPSIZ;  \
+  }  \
+} while (0)
+
 static void* _memcpy(void *dst, const void *src, unsigned int len) {
   unsigned long int dstp = (unsigned long int)dst;
   unsigned long int srcp = (unsigned long int)src;
 
-  while (len > 0) {
-    if (len < WORD_WIDTH ||
-        dstp % WORD_WIDTH != 0) { //aligned
-      ((unsigned char *)dstp)[0] = ((unsigned char *)srcp)[0];
-      dstp += 1;
-      srcp += 1;
-      len -= 1;
-    } else break;
+  if (len >= OP_T_THRES) {
+    /* Copy just a few bytes to make DSTP aligned. */
+    len -= (-dstp) % OPSIZ;
+    BYTE_COPY_FWD(dstp, srcp, (-dstp) % OPSIZ);
+
+    /* Copy from SRCP to DSTP taking advantage of the known alignment of
+      DSTP.  Number of bytes remaining is put in the third argument,
+      i.e. in LEN.  This number may vary from machine to machine. */
+
+    WORD_COPY_FWD(dstp, srcp, len / OPSIZ);
+    len = len % OPSIZ;
+
+    /* Fall out and copy the tail.  */
   }
 
-  unsigned int word_copy_cnt = len / WORD_WIDTH;
-  len = (len % WORD_WIDTH);
-
-  while (word_copy_cnt > 0) {
-    ((unsigned long int *)dstp)[0] = ((unsigned long int *)srcp)[0];
-    dstp += WORD_WIDTH;
-    srcp += WORD_WIDTH;
-    word_copy_cnt -= 1;
-  }
-
-  while (len > 0) {
-    ((unsigned char *)dstp)[0] = ((unsigned char *)srcp)[0];
-    dstp += 1;
-    srcp += 1;
-    len -= 1;
-  }
+  /* There are just a few bytes to copy.  Use byte memory operations.  */
+  BYTE_COPY_FWD (dstp, srcp, len);
 
   return dst;
 }
 
-#define OPSIZ sizeof(unsigned long int)
 static void* _memset(void *dstpp, int c, unsigned int len) {
   long int dstp = (long int) dstpp;
   if (len >= 8) {
