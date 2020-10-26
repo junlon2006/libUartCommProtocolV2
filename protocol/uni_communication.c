@@ -119,8 +119,7 @@ static void* _memcpy(void *dst, const void *src, unsigned int len) {
 
   while (len > 0) {
     if (len < WORD_WIDTH ||
-        dstp % WORD_WIDTH != 0 || //aligned
-        srcp % WORD_WIDTH != 0) { //aligned
+        dstp % WORD_WIDTH != 0) { //aligned
       ((unsigned char *)dstp)[0] = ((unsigned char *)srcp)[0];
       dstp += 1;
       srcp += 1;
